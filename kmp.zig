@@ -1,82 +1,69 @@
 const std = @import("std");
-const Allocator = std.mem.Allocator;
 
-fn prefixArray(alloc: std.mem.Allocator, pattern: []const u8) ![]const i32 {
-    var max_prefix_len = try alloc.alignedAlloc(i32, null, pattern.len);
-    std.mem.set(i32, max_prefix_len, 0);
-    // of pattern
-    var i: i32 = 1;
-    while (i < pattern.len) : (i += 1) {
-        // can the border of p[0..i-1] be extended by p[i] ?
-        // For this to happen, char after border(p[0..i-1]) must be == p[i]
-        // let j = border(p[0..i-1]). => Next char of border(p[0..i-1]) == p[j]
-        // we check then if p[j] = p[i]
-        // if not, we recursively loop by setting j = p[j] until j >=0 till j goes < 0
-        // or p[j] == p[i]
-        var j: i32 = max_prefix_len[@intCast(usize, i) - 1];
-        while (j > 0 and pattern[@intCast(usize, i)] != pattern[@intCast(usize, j)]) {
-            if (j - 1 >= 0) {
-                j = max_prefix_len[@intCast(usize, j) - 1];
-            } else j -= 1;
+// Return an array of border lengths where each element i
+// holds the length of the longest border of str[0..i]
+// A border is the longer *proper* suffix of str[0..i]
+// that is also a *proper* prefix of str[0..i]
+fn borderArray(pattern: []const u8, allocator: std.mem.Allocator) ![]usize {
+    var border_array = try allocator.alloc(usize, pattern.len);
+    var i: usize = 1;
+    var len: usize = 0; // holds the length of the current border under consideration
+    border_array[0] = 0; // No valid border for a single character
+    while (i < pattern.len) {
+        //pattern[0..len-1] is our current border
+        //we try to see if we can extend our border by one character
+        //to do this, we check if pattern[i] == pattern[len]
+        //if yes, we increment len and i
+        //if not, we find the border of the current border until len == 0
+        //or the next char after the boder == pattern[i]
+        if (pattern[len] == pattern[i]) {
+            len += 1; //current border is from 0..len-1 (=> length n). We are extending
+            //it by one
+            border_array[i] = len;
+            i += 1;
+        } else {
+            if (len != 0) {
+                len = border_array[len - 1];
+            } else {
+                border_array[i] = 0;
+                len = 0;
+                i += 1;
+            }
         }
-        j += 1;
-        max_prefix_len[@intCast(usize, i)] = j;
     }
+    return border_array;
+}
 
-    return max_prefix_len;
+fn kmpSearch(allocator: std.mem.Allocator, str: []const u8, pattern: []const u8) !void {
+    const border_array = try borderArray(pattern, allocator);
+    var i: usize = 0;
+    var j: usize = 0;
+    while (i < str.len) {
+        if (str[i] == pattern[j]) {
+            j += 1;
+            i += 1;
+
+            if (j == pattern.len) {
+                std.debug.print("Found pattern starting at pos {}\n", .{i - j});
+                j = border_array[j - 1];
+            }
+        } else {
+            if (j != 0) {
+                j = border_array[j - 1];
+            } else {
+                i += 1;
+            }
+        }
+    }
 }
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    var allocator = arena.allocator();
     defer arena.deinit();
-    var pattern: []const u8 = "abcabc";
-    var preCompute = try prefixArray(allocator, pattern);
-    std.debug.print("precompute array of {s} is {d}\n", .{ pattern, preCompute });
-    var text: []const u8 = "abcabd acbaet abcabc deadbeef abcabc";
-    search(text, pattern, preCompute);
-    pattern = "aaaaa";
-    preCompute = try prefixArray(allocator, pattern);
-    std.debug.print("precompute array of {s} is {d}\n", .{ pattern, preCompute });
-    pattern = "ababab";
-    preCompute = try prefixArray(allocator, pattern);
-    std.debug.print("precompute array of {s} is {d}\n", .{ pattern, preCompute });
-    pattern = "abacabab";
-    preCompute = try prefixArray(allocator, pattern);
-    std.debug.print("precompute array of {s} is {d}\n", .{ pattern, preCompute });
-    pattern = "aaabaaaaab";
-    preCompute = try prefixArray(allocator, pattern);
-    std.debug.print("precompute array of {s} is {d}\n", .{ pattern, preCompute });
-    pattern = "deadbutter";
-    preCompute = try prefixArray(allocator, pattern);
-    std.debug.print("precompute array of {s} is {d}\n", .{ pattern, preCompute });
-    text = "deadap deadbutter";
-    search(text, pattern, preCompute);
-}
-
-fn search(text: []const u8, pattern: []const u8, lsp: []const i32) void {
-    var j: i32 = 0; // Number of chars matched in pattern
-    var i: usize = 0;
-    while (i < text.len) : (i += 1) {
-        while (j > 0 and text[i] != pattern[@intCast(usize, j)]) {
-            // Fall back in the pattern
-            j = lsp[@intCast(usize, j) - 1]; // Strictly decreasing
-        }
-        if (text[i] == pattern[@intCast(usize, j)]) {
-            // Next char matched, increment position
-            j += 1;
-            if (j == pattern.len) {
-                var k = @intCast(usize, j) - 1;
-                std.debug.print("found from {}", .{i - k});
-                std.debug.print(": {s}\n", .{text[i - k .. i - k + pattern.len]});
-                j = lsp[@intCast(usize, j) - 1];
-            }
-            // Key Insight: When we finish matching the entire pattern
-            // we do start matching from the first character.
-            // Instead, we shift the length of the largest `border` of the pattern
-            // and start matching again from that, rather than j = 0
-        }
-    }
-
-    // return -1;  // Not found
+    var allocator = arena.allocator();
+    const pattern = "AAAB";
+    const missing_pattern = "badaboom";
+    const string = "AAAB AAB AA BB AAAAAAB";
+    try kmpSearch(allocator, string, pattern);
+    try kmpSearch(allocator, string, missing_pattern);
 }
