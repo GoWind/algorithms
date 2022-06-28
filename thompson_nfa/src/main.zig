@@ -13,22 +13,6 @@ const StateSet = std.AutoHashMap(*State, bool);
 
 const MyError = error{MyErr};
 
-fn get_prio(c: u8) u8 {
-    var val: u8 = switch (c) {
-        '*' => 60,
-        '+' => 55,
-        '?' => 50,
-        '.' => 40,
-        '|' => 20,
-        else => 0,
-    };
-
-    return val;
-}
-
-test "get_prio test" {
-    try expect(get_prio('*') == 60);
-}
 const Err = error{ShuntErr};
 
 fn shunt(a: Allocator, infix: []const u8, postfix: []u8) !usize {
