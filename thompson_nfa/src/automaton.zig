@@ -1,4 +1,5 @@
 const std = @import("std");
+const fmt = std.fmt;
 const debug = std.debug;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
@@ -6,7 +7,7 @@ const heap = std.heap;
 const expect = std.testing.expect;
 const testing = std.testing;
 
-pub const State = struct { label: ?u8 = null, out: ?*State = null, out1: ?*State = null };
+pub const State = struct { label: ?u8 = null, out: ?*State = null, out1: ?*State = null, state_num: u32 = 0 };
 pub const NFA = struct { initial: *State, accept: *State };
 pub const NFAList = ArrayList(NFA);
 pub const StateSet = std.AutoHashMap(*State, bool);
@@ -14,6 +15,17 @@ pub const StateSet = std.AutoHashMap(*State, bool);
 const MyError = error{MyErr};
 
 const Err = error{ShuntErr};
+
+fn is_special_label(c: u8) bool {
+    switch (c) {
+        '+', ' ', '|', '?', '*', '@' => {
+            return true;
+        },
+        else => {
+            return false;
+        },
+    }
+}
 
 fn shunt(a: Allocator, infix: []const u8, postfix: []u8) !usize {
     const shunt_state = struct { nalt: usize = 0, natom: usize = 0 };
@@ -124,16 +136,26 @@ test "proper_shunt test " {
     try expect(std.mem.eql(u8, postfix2[0..14], "ab+.c*.ed|?.f."));
 }
 
-pub fn compile(a: Allocator, postfix: []const u8) !NFA {
+pub fn compile_nfa(a: Allocator, infix: []const u8) !NFA {
+    var postfix = try a.alloc(u8, 2 * infix.len);
+    defer a.free(postfix);
+    var postfixlen = try shunt(a, infix, postfix);
+    postfix = a.resize(postfix, postfixlen) orelse return Err.ShuntErr;
+    var nfa = compile(a, postfix) catch @panic("failed to compile NFA");
+    return nfa;
+}
+
+fn compile(a: Allocator, postfix: []const u8) !NFA {
     var nfaStack = NFAList.init(a);
     var i: usize = 0;
+    var node_counter: u32 = 0;
     while (i < postfix.len) : (i += 1) {
         const c = postfix[i];
         switch (c) {
             '*' => {
                 var nfa1 = nfaStack.pop();
-                var initial = try create_state(a);
-                var accept = try create_state(a);
+                var initial = try create_state(a, &node_counter, '*');
+                var accept = try create_state(a, &node_counter, ' ');
                 initial.out = nfa1.initial;
                 initial.out1 = accept;
                 // point back to initial state to match more chars
@@ -151,18 +173,18 @@ pub fn compile(a: Allocator, postfix: []const u8) !NFA {
             '|' => {
                 var e2 = nfaStack.pop();
                 var e1 = nfaStack.pop();
-                var initial = try create_state(a);
+                var initial = try create_state(a, &node_counter, '|');
                 initial.out = e1.initial;
                 initial.out1 = e2.initial;
-                var accept = try create_state(a);
+                var accept = try create_state(a, &node_counter, ' ');
                 e1.accept.out = accept;
                 e2.accept.out = accept;
                 try nfaStack.append(NFA{ .initial = initial, .accept = accept });
             },
             '+' => {
                 var e1 = nfaStack.pop();
-                var initial = try create_state(a);
-                var accept = try create_state(a);
+                var initial = try create_state(a, &node_counter, '+');
+                var accept = try create_state(a, &node_counter, '@');
 
                 initial.out = e1.initial;
                 e1.accept.out = e1.initial;
@@ -171,17 +193,16 @@ pub fn compile(a: Allocator, postfix: []const u8) !NFA {
             },
             '?' => {
                 var e1 = nfaStack.pop();
-                var initial = try create_state(a);
-                var accept = try create_state(a);
+                var initial = try create_state(a, &node_counter, '?');
+                var accept = try create_state(a, &node_counter, ' ');
                 initial.out = e1.initial;
                 initial.out1 = accept;
                 e1.accept.out = accept;
                 try nfaStack.append(NFA{ .initial = initial, .accept = accept });
             },
             else => {
-                var initial = try create_state(a);
-                var accept = try create_state(a);
-                initial.label = c;
+                var initial = try create_state(a, &node_counter, c);
+                var accept = try create_state(a, &node_counter, ' ');
                 initial.out = accept;
                 try nfaStack.append(NFA{ .initial = initial, .accept = accept });
             },
@@ -191,18 +212,20 @@ pub fn compile(a: Allocator, postfix: []const u8) !NFA {
     return nfaStack.pop();
 }
 
-fn create_state(a: Allocator) !*State {
+fn create_state(a: Allocator, node_counter: *u32, label: u8) !*State {
     var s = try a.create(State);
+    node_counter.* += 1;
     s.out = null;
     s.out1 = null;
-    s.label = null;
+    s.label = label;
+    s.state_num = node_counter.*;
     return s;
 }
 
 // This is equivalent to the addstate fn
 pub fn follows(state: *State, state_set: *StateSet) MyError!void {
     _ = state_set.put(state, true) catch return MyError.MyErr;
-    if (state.label == null) {
+    if (state.label == null or (is_special_label(state.label.?) == true)) {
         if (state.out != null) {
             try follows(state.out.?, state_set);
         }
@@ -241,7 +264,7 @@ pub fn to_postfix(a: Allocator, infix: []u8) ![]u8 {
     return postfix;
 }
 
-pub fn match(a: Allocator, infix: []u8, input: []u8) !bool {
+pub fn match(a: Allocator, infix: []const u8, input: []const u8) !bool {
     var currents = StateSet.init(a);
     var nexts = StateSet.init(a);
     // Next 4 lines is a duplicate of the
@@ -250,7 +273,6 @@ pub fn match(a: Allocator, infix: []u8, input: []u8) !bool {
     defer a.free(postfix);
     var postfixlen = try shunt(a, infix, postfix);
     postfix = a.resize(postfix, postfixlen) orelse return Err.ShuntErr;
-    debug.print("postfix is {s} and with resized len {}", .{ postfix, postfix.len });
     var nfa = compile(a, postfix) catch @panic("failed to compile NFA");
     // **ALGO STARTS HERE**
     // Add initial state to current
@@ -259,11 +281,11 @@ pub fn match(a: Allocator, infix: []u8, input: []u8) !bool {
     try follows(nfa.initial, &currents);
     var ii: usize = 0;
     while (ii < input.len) : (ii += 1) {
+        var c = input[ii];
         var c_iterator = currents.keyIterator();
         while (c_iterator.next()) |key| {
             if (key.*.label) |l| {
-                if (l == input[ii] and key.*.out != null) {
-                    // This is equivalent to the `step` fn in the original implementation
+                if (l == c and key.*.out != null) {
                     follows(key.*.out.?, &nexts) catch @panic("kaboom");
                 }
             }
@@ -285,4 +307,53 @@ test "match test" {
     var input = "abbb".*;
     var matched = try match(h, &infix, &input);
     try expect(matched == true);
+    var infix2 = "a(c|d)+".*;
+    var input2 = "acd".*;
+    matched = try match(h, &infix2, &input2);
+    try expect(matched == true);
 }
+
+//return a string representing the dotviz
+//representation of the NFA
+pub fn printNFA(a: Allocator, n: NFA) ![]u8 {
+    var seen_set = StateSet.init(a);
+    defer seen_set.clearAndFree();
+    var state_queue = ArrayList(*State).init(a);
+    var nfa_string = try fmt.allocPrint(a, "digraph G {{ rankdir=LR; \n", .{});
+    var initial = n.initial;
+    try state_queue.append(initial);
+    while (state_queue.items.len > 0) {
+        var item = state_queue.items[0];
+        if (seen_set.contains(item) == false) {
+            var split: u8 = item.label orelse '-';
+            nfa_string = try fmt.allocPrint(a, "{s} \n {d} [label=\"{c}\"]", .{ nfa_string, item.state_num, split });
+            if (item.out != null) {
+                try state_queue.append(item.out.?);
+                nfa_string = try fmt.allocPrintZ(a, "{s} \n {d} -> {d}", .{ nfa_string, item.state_num, item.out.?.state_num });
+            }
+            if (item.out1 != null) {
+                try state_queue.append(item.out1.?);
+                nfa_string = try fmt.allocPrintZ(a, "{s} \n {d} -> {d}", .{ nfa_string, item.state_num, item.out1.?.state_num });
+            }
+            try seen_set.put(item, true);
+        }
+        _ = state_queue.orderedRemove(0);
+    }
+    nfa_string = try fmt.allocPrint(a, "{s} \n {d} [shape=polygon,sides=5,peripheries=3]", .{ nfa_string, n.accept.state_num });
+    nfa_string = try fmt.allocPrint(a, "{s} }}", .{nfa_string});
+    return nfa_string;
+}
+
+// test "printNFA test" {
+//     var t = std.testing.allocator;
+//     var arena = std.heap.ArenaAllocator.init(t);
+//     defer arena.deinit();
+//     var h = arena.allocator();
+//     var c = State{ .label = 'c', .out = null, .out1 = null };
+//     var b = State{ .label = 'b', .out = null, .out1 = null };
+//     var a = State{ .label = 'a', .out = &b, .out1 = &c };
+//     var nfa = NFA{ .initial = &a, .accept = &c };
+//     var nfa_string = try printNFA(h, nfa);
+//     var expected_nfa = "digraph G { \n a -> b \n a -> c }".*;
+//     try std.testing.expectEqualStrings(nfa_string, &expected_nfa);
+// }
