@@ -28,10 +28,10 @@ pub fn div(s: *Calculator, x: f32, y: f32) f32 {
 // the fns in the interface
 // These fns have the same signature as our interface fns
 // except the ptr arg is type-erased
-const addProto = fn (ptr: *anyopaque, i32, i32) i32;
-const subProto = fn (ptr: *anyopaque, i32, i32) i32;
-const mulProto = fn (ptr: *anyopaque, i32, i32) i32;
-const divProto = fn (ptr: *anyopaque, f32, f32) f32;
+const addProto = *const fn (ptr: *anyopaque, i32, i32) i32;
+const subProto = *const fn (ptr: *anyopaque, i32, i32) i32;
+const mulProto = *const fn (ptr: *anyopaque, i32, i32) i32;
+const divProto = *const fn (ptr: *anyopaque, f32, f32) f32;
 
 //comptime is the key, as it lets us know
 //the signature of the implementing function at compile time
@@ -71,6 +71,8 @@ pub fn init(optr: *anyopaque, comptime addI: addProto, comptime subI: subProto, 
 }
 
 //Curious , does this blow up, as `vtable` is on the stack and I return a pointer to something on the stack ?
+//Ans: No, because the compiler is smart enough to know that comptime parmeters must come from `.text` or `.rodata`,
+//or are immediate, so it returns a pointer to `.text` or `.rodata`
 pub fn initStack(ptr: *anyopaque, comptime addI: addProto, comptime subI: subProto, comptime mulI: mulProto, comptime divI: divProto) Calculator {
     // This doesn't seem to be allocated on the stack, but rather, `.rodata`. Hmm
     // https://onlinedisassembler.com/odaweb/suZB0XjG/0
