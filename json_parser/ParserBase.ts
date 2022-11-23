@@ -1,13 +1,6 @@
-interface IParser<T> {
-  // Why a Source and not just a string ? 
-  // Ans: We need to keep track of the index into the string from which we are 
-  // trying to match something. Hence.
-  // Also, source can be anything tomorrow (a file, a socket etc) parse(s: Source): ParseResult<T> | null;
-}
-
 export class Source {
-  constructor(public string: string, 
-              public index: number) {}
+  constructor(public string: string,
+    public index: number) { }
   match(regexp: RegExp): (ParseResult<string> | null) {
     console.assert(regexp.sticky);
     regexp.lastIndex = this.index;
@@ -38,22 +31,22 @@ export class ParseResult<T> {
   //Ans: We want to keep track of which index to start finding the next item from
   //Hence
   constructor(public value: T,
-              public source: Source) {}
+    public source: Source) { }
 
 }
 
 export class Parser<T> {
   constructor(
     public parse: (source: Source) => (ParseResult<T> | null),
-    public debug: boolean = false, 
+    public debug: boolean = false,
     //Use the name to debug your parser's flow
-    public name: string = "noname") {}
+    public name: string = "noname") { }
 
   static regexp(regexp: RegExp): Parser<string> {
-    return new Parser( source => source.match(regexp), false,`Regexp: ${regexp}` );
+    return new Parser(source => source.match(regexp), false, `Regexp: ${regexp}`);
   }
 
-  static constant<U>(value: U): Parser<U> {
+  static constant<U>(value: U, name: string = ""): Parser<U> {
     return new Parser((source) => {
       return new ParseResult(value, source)
     }, true, "constant");
@@ -70,7 +63,7 @@ export class Parser<T> {
   // making it to T|U. Will this work ?
   // ans: no, because in our Parser class signature we type `value` as (source): ParseResult<U> | null
   or(otherParser: Parser<T>): Parser<T> {
-    return new Parser( (source) => {
+    return new Parser((source) => {
       let result = this.parse(source);
       if (result) {
         return result;
@@ -80,14 +73,14 @@ export class Parser<T> {
       // tries to match. Had it succeeded, the next parser would have started at
       // source.length + result.value.length or something;
       return otherParser.parse(source);
-    }, false, "or parsers");
+    }, false, "or Parser");
   }
 
   static zeroOrMore<U>(parser: Parser<U>): Parser<Array<U>> {
     return new Parser((source) => {
       let results = [];
-      let item ; 
-      while(item = parser.parse(source)) {
+      let item;
+      while (item = parser.parse(source)) {
         source = item.source;
         results.push(item.value);
       }
@@ -104,9 +97,6 @@ export class Parser<T> {
       if (result) {
         let value = result.value;
         let source = result.source;
-        if(debugNext) {
-          console.log(`found ${JSON.stringify(value)}. finding next from ${source.string.slice(source.index)}`);
-        }
         return callback(value).parse(source);
       } else {
         return null;
@@ -119,24 +109,24 @@ export class Parser<T> {
   }
 
   map<U>(callback: (t: T) => U): Parser<U> {
-    return this.bind((value) => 
-      Parser.constant(callback(value)));
+    return this.bind((value) =>
+      Parser.constant(callback(value), this.name));
   }
 
   static maybe<U>(
     parser: Parser<U | null>):
-    (Parser<U | null >) {
+    (Parser<U | null>) {
     return parser.or(Parser.constant(null));
   }
 
   parseStringToCompletion(string: string): T {
     let source = new Source(string, 0);
     let result = this.parse(source);
-    if(!result) {
+    if (!result) {
       throw Error("Parse Error, could not parse anything");
     }
     let index = result.source.index;
-    if(index != result.source.string.length) {
+    if (index != result.source.string.length) {
       throw Error("Parse error at index " + index);
     }
     return result.value;
