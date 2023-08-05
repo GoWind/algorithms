@@ -117,7 +117,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
             return new_root;
         }
 
-        pub fn delete(self: ?*Self, alloc: Allocator, key: i32) ?*Self {
+        pub fn delete(self: ?*Self, alloc: Allocator, key: K) ?*Self {
             if (self == null) {
                 return null;
             }
@@ -145,21 +145,24 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
             if (self == null) {
                 return null;
             } // why this check again ?
-
+            // This section is reached, if the deleted node is a child leaf/node of the current node
+            // we check that all the nodes from the deleted leaf/node -> root are balanced and if not, rebalance
             node.height = 1 + std.math.max(Self.Height(node.left), Self.Height(node.right));
             var balance = Self.balanceFactor(self);
+            // Left Left
             if (balance > 1 and Self.balanceFactor(node.left) >= 0) {
                 return Self.rotateRight(node);
             }
+            // Left right
             if (balance > 1 and Self.balanceFactor(node.left) < 0) {
                 node.left = Self.rotateLeft(node.left.?);
                 return node.rotateRight();
             }
-
+            // Right Right
             if (balance < -1 and Self.balanceFactor(node.right) <= 0) {
                 return Self.rotateLeft(node);
             }
-
+            // Right Left
             if (balance < -1 and Self.balanceFactor(node.right) > 0) {
                 node.right = Self.rotateRight(node.right.?);
                 return node.rotateLeft();
@@ -193,7 +196,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
             }
         }
 
-        pub fn search(self: *Self, key: i32) ?u32 {
+        pub fn search(self: *Self, key: K) ?u32 {
             if (self.key == key) {
                 return self.value;
             }
@@ -219,15 +222,15 @@ fn AvlTree(comptime K: type, comptime V: type) type {
         const Self = @This();
         const node_type = AvlNode(K, V);
         root: ?*node_type = null,
-        pub fn insert(self: *Self, alloc: Allocator, key: i32, val: V) !void {
+        pub fn insert(self: *Self, alloc: Allocator, key: K, val: V) !void {
             var new_node = try node_type.withKV(alloc, key, val);
             self.root = node_type.insert(self.root, new_node);
         }
-        pub fn delete(self: *Self, alloc: Allocator, key: i32) void {
+        pub fn delete(self: *Self, alloc: Allocator, key: K) void {
             self.root = node_type.delete(self.root, alloc, key);
         }
 
-        pub fn search(self: *Self, key: i32) ?u32 {
+        pub fn search(self: *Self, key: K) ?V {
             if (self.root == null) {
                 return null;
             }
@@ -243,22 +246,22 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
     var allocator = arena.allocator();
-    // i32 -> u32
-    const itree = AvlTree(i32, u32);
+    // u32 -> u32
+    const utree = AvlTree(u32, u32);
     // i32 key -> f32 value
-    const ftree = AvlTree(i32, f32);
+    const ftree = AvlTree(u32, f32);
 
-    var tree = itree{};
+    var tree = utree{};
     var fp_tree = ftree{};
 
     var prng = std.rand.DefaultPrng.init(0);
     prng.seed(100);
     const random = prng.random();
     var i: usize = 0;
-    var keysList = std.ArrayList(i32).init(allocator);
+    var keysList = std.ArrayList(u32).init(allocator);
 
     while (i < 100) : (i += 1) {
-        var key: i32 = random.int(i32);
+        var key: u32 = random.int(u32);
         var value: u32 = random.uintAtMost(u32, 350000);
         var fpvalue: f32 = random.float(f32);
         try tree.insert(allocator, key, value);
@@ -272,7 +275,6 @@ pub fn main() !void {
         std.debug.assert(v != null);
         var fp_v = tree.search(k);
         std.debug.assert(fp_v != null);
-        std.debug.print("deleting key {}\n", .{k});
         tree.delete(allocator, k);
         if (tree.root != null) {
             tree.root.?.check();
