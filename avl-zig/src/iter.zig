@@ -1,6 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Order = std.math.Order;
+var stdout = std.io.getStdOut().writer();
 
 pub fn AvlNode(comptime K: type, comptime V: type) type {
     return struct {
@@ -17,7 +18,47 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
             return newNode;
         }
 
-        pub fn withKV(alloc: Allocator, key: K, val: V) !*Self {
+	pub fn bst_print_dot(maybe_tree: ?*Self, writer: *std.fs.File.Writer) !void {
+		try writer.print("digraph BST {{\n", .{});
+		try writer.print("    node [fontname=\"Arial\"];\n", .{});
+		if(maybe_tree) |tree| {
+			try writer.print("\n", .{});
+			
+			if(tree.left == null and tree.right == null) {
+				try writer.print("    {};\n", .{tree.key});
+			} else {
+				try Self.bst_print_dot_aux(tree, writer);
+			}
+		}
+		try writer.print("}}\n", .{});
+	}
+	fn bst_print_dot_aux(node: *Self, writer: *std.fs.File.Writer) !void {
+		const NodeCounter = struct {
+		var node_count: usize = 0;
+		};
+    		if (node.left) |l| {
+			try writer.print("    {} -> {};\n", .{node.key, l.key});
+			try Self.bst_print_dot_aux(l, writer);
+		} else {
+			NodeCounter.node_count += 1;
+			try Self.bst_print_dot_null(node, NodeCounter.node_count, writer);
+		}
+		if(node.right) |r| {
+			try writer.print("    {} -> {};\n", .{node.key, r.key});
+			try Self.bst_print_dot_aux(r, writer);
+		} else {
+			NodeCounter.node_count += 1;
+			try Self.bst_print_dot_null(node, NodeCounter.node_count, writer);
+		}
+
+	}
+	
+	fn bst_print_dot_null(node: *Self, node_count: usize, writer: *std.fs.File.Writer) !void {
+		try writer.print("    null{} [shape=point];\n", .{node_count});
+		try writer.print("    {} -> null{};\n", .{node.key, node_count});
+	}
+
+	pub fn withKV(alloc: Allocator, key: K, val: V) !*Self {
             var new_n = try Self.new(alloc);
             new_n.* = Self{ .key = key, .value = val };
             return new_n;
@@ -36,7 +77,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
         }
 
         fn update(node: *Self) void {
-            node.height = 1 + std.math.max(Self.Height(node.left), Self.Height(node.right));
+            node.height = 1 + @max(Self.Height(node.left), Self.Height(node.right));
             node.cnt = 1 + Self.Cnt(node.left) + Self.Cnt(node.right);
         }
 
@@ -73,9 +114,9 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
                 // usize cannot be < 0
                 if (right_height > left_height) {
                     var diff = right_height - left_height;
-                    return -1 * @intCast(i32, diff);
+                    return -1 * @as(i32, @intCast(diff));
                 } else {
-                    return @intCast(i32, left_height - right_height);
+                    return @as(i32, @intCast(left_height - right_height));
                 }
             } else {
                 return 0;
@@ -191,10 +232,8 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
                 } else {
                     us_parent.right = v;
                 }
-            } else {
-                return;
-            }
-        }
+            }         
+	}
         pub fn deleteIter(self: ?*Self, node_alloc: Allocator, key: K) ?*Self {
             if (self == null) {
                 return null;
@@ -212,7 +251,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
                     traversal_list.append(cur_node.?) catch @panic("allocation error");
                     cur_node = cur_node.?.left;
                 }
-                if (cur_node.?.key < key and cur_node.?.right != null) {
+                else if (cur_node.?.key < key and cur_node.?.right != null) {
                     traversal_list.append(cur_node.?) catch @panic("allocation error");
                     cur_node = cur_node.?.right;
                 } else {
@@ -248,7 +287,6 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
                     min_node = min_node.left.?;
                 }
                 if (min_node_parent == n) {
-                    move_node(n, min_node, maybe_curnode_parent);
                     std.debug.assert(traversal_list.items[traversal_list.items.len - 1] == n);
                     move_node(n, min_node, maybe_curnode_parent);
                     min_node.left = n.left;
@@ -301,12 +339,11 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
             if (node.right) |r| {
                 if (r.key <= node.key) {
                     std.debug.print("violation: right <= node {} :: {}\n", .{ r.key, node.key });
-                    return true;
+                    return false;
                 }
                 right_check = Self.check(node.right.?);
             }
-
-            return left_check and right_check;
+	    return left_check and right_check;
         }
 
         pub fn search(self: *Self, key: K) ?u32 {
@@ -343,37 +380,6 @@ fn AvlTree(comptime K: type, comptime V: type) type {
             self.root = node_type.deleteIter(self.root, alloc, key);
         }
 
-        const SelfPrioS = struct {
-            key: *node_type,
-            prio: u32,
-            const SSelf = @This();
-            pub fn comparator(_: void, a: SSelf, b: SSelf) Order {
-                if (a.prio <= b.prio) {
-                    return Order.lt;
-                } else {
-                    return Order.gt;
-                }
-            }
-        };
-
-        const QType = std.PriorityQueue(SelfPrioS, void, SelfPrioS.comparator);
-        pub fn visitLevelwise(self: *Self, alloc: Allocator) !void {
-            if (self.root == null) {
-                return;
-            }
-            var q = QType.init(alloc, {});
-            defer q.deinit();
-            try q.add(SelfPrioS{ .key = self.root.?, .prio = 0 });
-            while (q.removeOrNull()) |front| {
-                std.debug.print("level {} and key {} \n", .{ front.prio, front.key.key });
-                if (front.key.left) |fl| {
-                    try q.add(SelfPrioS{ .key = fl, .prio = 2 * front.prio + 1 });
-                }
-                if (front.key.right) |fr| {
-                    try q.add(SelfPrioS{ .key = fr, .prio = 2 * front.prio + 2 });
-                }
-            }
-        }
         pub fn search(self: *Self, key: K) ?V {
             if (self.root == null) {
                 return null;
@@ -385,8 +391,6 @@ fn AvlTree(comptime K: type, comptime V: type) type {
 }
 
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
     var allocator = arena.allocator();
@@ -408,19 +412,25 @@ pub fn main() !void {
         std.debug.assert(tree.root.?.check() == true);
         try keysList.append(key);
     }
-    try tree.visitLevelwise(allocator);
     for (keysList.items) |k| {
         var v = tree.search(k);
-        std.debug.print("searching for key: {} \n", .{k});
         if (v == null) {
-            std.debug.print("missing {}\n", .{k});
+		@panic("failed to delete and return something");
         }
         tree.delete(allocator, k);
+	v = tree.search(k);
+	if(v != null) {
+	   std.debug.print("failed to delete {}\n", .{k});
+	   try tree.root.?.bst_print_dot(&stdout);
+	   @panic("kokaka");
+	}
         if (tree.root != null and tree.root.?.check() == false) {
-            try tree.visitLevelwise(allocator);
+		try tree.root.?.bst_print_dot(&stdout);
+		@panic("check failed after delete");
         }
     }
     std.debug.assert(tree.root == null);
 }
+
 
 test "simple test" {}
