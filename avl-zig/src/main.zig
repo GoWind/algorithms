@@ -35,7 +35,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
         }
 
         fn update(node: *Self) void {
-            node.height = 1 + std.math.max(Self.Height(node.left), Self.Height(node.right));
+            node.height = 1 + @max(Self.Height(node.left), Self.Height(node.right));
             node.cnt = 1 + Self.Cnt(node.left) + Self.Cnt(node.right);
         }
 
@@ -72,9 +72,9 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
                 // usize cannot be < 0
                 if (right_height > left_height) {
                     var diff = right_height - left_height;
-                    return -1 * @intCast(i32, diff);
+                    return -1 * @as(i32, @intCast(diff));
                 } else {
-                    return @intCast(i32, left_height - right_height);
+                    return @as(i32, @intCast(left_height - right_height));
                 }
             } else {
                 return 0;
@@ -95,7 +95,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
             } else {
                 cur.right = Self.insert(cur.right, child);
             }
-            cur.height = 1 + std.math.max(Self.Height(cur.left), Self.Height(cur.right));
+            cur.height = 1 + @max(Self.Height(cur.left), Self.Height(cur.right));
 
             var balance = Self.balanceFactor(cur);
             if (balance == -1 or balance == 0 or balance == 1) {
@@ -147,7 +147,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
             } // why this check again ?
             // This section is reached, if the deleted node is a child leaf/node of the current node
             // we check that all the nodes from the deleted leaf/node -> root are balanced and if not, rebalance
-            node.height = 1 + std.math.max(Self.Height(node.left), Self.Height(node.right));
+            node.height = 1 + @max(Self.Height(node.left), Self.Height(node.right));
             var balance = Self.balanceFactor(self);
             // Left Left
             if (balance > 1 and Self.balanceFactor(node.left) >= 0) {
