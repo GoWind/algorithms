@@ -61,9 +61,9 @@ The formatted string stored at `.stack` can be customized. You can do this by at
 
 The `active` object is a global Map mapping each `asyncId` to its type, the stack of fns in the Error. 
 
-When you need the information about why your node process is kept alive, you call the `whyIsNodeRunning` function, which iterates through the list of all async object created, identifies the ones that can keep the even loop alive (for example, Unresolved Promises do not keep the event loop alive) and then prints the information about them. An extract from the `why-is-node-running` library
+When you need the information about why your node process is kept alive, you call the `whyIsNodeRunning` function, which iterates through the list of all async object created, identifies the ones that can keep the even loop alive (for example, Unresolved Promises do not keep the event loop alive). The objects that can keep the event loop alive, have a `hasRef` function that returns `true` when called.  An extract from the `why-is-node-running` library:
 
-```
+```js
 function whyIsNodeRunning (logger) {
   if (!logger) logger = console
 
@@ -86,7 +86,11 @@ function whyIsNodeRunning (logger) {
     })
 ```
 
-Well if my node instance is stuck, how do I trigger this function ? Enter Unix Signals. We can send a Signal to a process, which triggers a signal handler to handle it. Some Signals (like KILL, SEGV) cannot be handled and the process terminates, but there are standard signals that can be customized and handled by our process. For example, SIGUSR1 and SIGUSR2 can be customized by the program for Interprocess communication or custom signal handling etc (you can also use SIGPIPE, because Node by default ignores SIGPIPE) 
+Well if my Node instance is stuck, how do I trigger this function ? 
+
+Enter Unix Signals. 
+
+We can send a Signal to a process, which triggers a signal handler to handle it. Some Signals (like KILL, SEGV) cannot be handled and the process terminates, but there are standard signals that can be customized and handled by our process. For example, SIGUSR1 and SIGUSR2 can be customized by the program for Interprocess communication or custom signal handling etc (you can also use SIGPIPE, because Node by default ignores SIGPIPE) 
 
 In NodeJS, we can setup a signal handler on our process to execute a function when a signal is received. I set up 
 the signal handler in my demo, to trigger the function that iterates through the map of async objects created to see 
@@ -96,4 +100,7 @@ what object could possibly keeping the program alive
 process.on('SIGUSR1', () => { console.log("captured sigterm") ; showMeTheCulprit(fd)});
 ```
 
+#### Caveats 
+
+Async Hooks have a [performance impact](https://github.com/nodejs/benchmarking/issues/181). It might be prudent to have this instrumentation as an alternate `main` function of sorts, to be used only when you run into issues and have to debug the program and not running all the time in Production
 Researching on this topic was a fantastic way for me to learn a bit more about NodeJS internals and how asynchronous object work :) To more such hacking and learning
