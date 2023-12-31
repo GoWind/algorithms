@@ -32,6 +32,9 @@ function init(asyncId, type, triggerAsyncId, resource) {
 
 function destroy(asyncId) {
     fs.writeSync(fd, `Destroy callback async id -->${asyncId} \n`);
+    if(trackingMap.has(asyncId)) {
+      trackingMap.delete(asyncId);
+    }
 }
 
 const asyncHook = async_hooks.createHook({ init: init, destroy });
