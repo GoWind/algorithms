@@ -103,4 +103,6 @@ process.on('SIGUSR1', () => { console.log("captured sigterm") ; showMeTheCulprit
 #### Caveats 
 
 Async Hooks have a [performance impact](https://github.com/nodejs/benchmarking/issues/181). It might be prudent to have this instrumentation as an alternate `main` function of sorts, to be used only when you run into issues and have to debug the program and not running all the time in Production
+
+#### Conclusion
 Researching on this topic was a fantastic way for me to learn a bit more about NodeJS internals and how asynchronous object work :) To more such hacking and learning
