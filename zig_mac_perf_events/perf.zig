@@ -57,7 +57,8 @@ const perfDb = struct {
 };
 const perfLib = struct {
     const Self = @This();
-
+    kpc_get_thread_counters: *const fn (u32, u32, [*]u64) callconv(.C) i32,
+    kpc_get_counter_count: *const fn (u32) callconv(.C) u32,
     kpc_pmu_version: *const fn () callconv(.C) u32,
     kpc_force_all_ctrs_get: *const fn (*i32) callconv(.C) i32,
     /// acquire or release counters. param 1 = acquire, 0 = release
@@ -73,14 +74,24 @@ const perfLib = struct {
 
     pub fn new(d: std.DynLib) Self {
         var libPerf = d;
-        return Self{ .kpc_pmu_version = libPerf.lookup(*const fn () callconv(.C) u32, "kpc_pmu_version").?, .kpc_force_all_ctrs_get = libPerf.lookup(*const fn (*i32) callconv(.C) i32, "kpc_force_all_ctrs_get").?, .kpc_force_all_ctrs_set = libPerf.lookup(*const fn (i32) callconv(.C) i32, "kpc_force_all_ctrs_set").?, .kpc_set_config = libPerf.lookup(*const fn (u32, *kpc_config) callconv(.C) i32, "kpc_set_config").?, .kpc_set_counting = libPerf.lookup(*const fn (u32) callconv(.C) i32, "kpc_set_counting").?, .kpc_set_thread_counting = libPerf.lookup(*const fn (u32) callconv(.C) i32, "kpc_set_thread_counting").? };
+        return Self{ .kpc_get_thread_counters = libPerf.lookup(*const fn (u32, u32, [*]u64) callconv(.C) i32, "kpc_get_thread_counters").?, .kpc_get_counter_count = libPerf.lookup(*const fn (u32) callconv(.C) u32, "kpc_get_counter_count").?, .kpc_pmu_version = libPerf.lookup(*const fn () callconv(.C) u32, "kpc_pmu_version").?, .kpc_force_all_ctrs_get = libPerf.lookup(*const fn (*i32) callconv(.C) i32, "kpc_force_all_ctrs_get").?, .kpc_force_all_ctrs_set = libPerf.lookup(*const fn (i32) callconv(.C) i32, "kpc_force_all_ctrs_set").?, .kpc_set_config = libPerf.lookup(*const fn (u32, *kpc_config) callconv(.C) i32, "kpc_set_config").?, .kpc_set_counting = libPerf.lookup(*const fn (u32) callconv(.C) i32, "kpc_set_counting").?, .kpc_set_thread_counting = libPerf.lookup(*const fn (u32) callconv(.C) i32, "kpc_set_thread_counting").? };
     }
 };
 /// The events we are interested in tracking;
 const m2MacEvents = [_][]const u8{ "FIXED_CYCLES", "FIXED_INSTRUCTIONS", "INST_BRANCH", "BRANCH_MISPRED_NONSPEC" };
+/// counter_map[i] contains index of register[i] where i is the event we are interested in tracking
+/// event is counted sequentially in the order we express interest in tracking them (via add_event)
 var counter_map = [_]usize{0} ** 32;
 /// The actual register values for each perf counter
 var regs = [_]u64{0} ** 32;
+const performance_counters = struct {
+    cycles: u64,
+    instructions: u64,
+    branches: u64,
+    branch_misses: u64,
+};
+threadlocal var counters = [_]u64{0} ** 32;
+
 pub fn main() !void {
     var libPerf = try std.DynLib.open("/System/Library/PrivateFrameworks/kperf.framework/kperf");
     var libPerfData = try std.DynLib.open("/System/Library/PrivateFrameworks/kperfdata.framework/kperfdata");
@@ -154,7 +165,7 @@ pub fn main() !void {
     }
 
     // Try to acquire registers needed for our perf counting from the Power Manager
-    if (perf_lib.kpc_force_all_ctrs_set(1) != 0 ) {
+    if (perf_lib.kpc_force_all_ctrs_set(1) != 0) {
         @panic("Failed force all ctrs");
     }
     const KPC_CLASS_CONFIGURABLE_MASK = 2;
@@ -174,4 +185,41 @@ pub fn main() !void {
     if (perf_lib.kpc_set_thread_counting(classes) != 0) {
         @panic("Failed set thread counting");
     }
+    var pc = thread_get_performance_counters(perf_lib, &counters, &counter_map);
+    var kk = hashSliceAnd(&"old yeller had a big fat dog that would just sleep all the time".*, 16384);
+    var pc2 = thread_get_performance_counters(perf_lib, &counters, &counter_map);
+
+    std.debug.print("hashSliceAnd took {} cycles and {} instructions with res {}\n", .{ pc2.cycles - pc.cycles, pc2.instructions - pc.instructions, kk });
+
+    pc = thread_get_performance_counters(perf_lib, &counters, &counter_map);
+    kk = hashSliceAnd(&"old yeller had a big fat dog that would just sleep all the time".*, 16384);
+    pc2 = thread_get_performance_counters(perf_lib, &counters, &counter_map);
+
+    std.debug.print("hashSliceModule took {} cycles and {} instructions with res {}\n", .{ pc2.cycles - pc.cycles, pc2.instructions - pc.instructions, kk });
+}
+
+pub fn thread_get_performance_counters(plib: perfLib, cc: []u64, config_map: []u64) performance_counters {
+    const lenu32: u32 = @truncate(cc.len);
+    if (plib.kpc_get_thread_counters(0, lenu32, cc.ptr) != 0) {
+        @panic("unable to get perf countes value");
+    }
+    return performance_counters{ .cycles = cc[config_map[0]], .instructions = cc[config_map[1]], .branches = cc[config_map[2]], .branch_misses = cc[config_map[3]] };
+}
+
+fn hashSliceAnd(data: []const u8, totalSize: usize) usize {
+    var k: usize = 0;
+    var hash: usize = 0;
+    while (k < data.len) : (k += 1) {
+        hash = (hash * 31 + data[k]) & (totalSize - 1);
+    }
+    return hash;
+}
+
+fn hashSliceModulo(data: []const u8, totalSize: usize) usize {
+    var k: usize = 0;
+    var hash: usize = 0;
+    while (k < data.len) : (k += 1) {
+        hash = (hash * 31 + data[k]) % (totalSize);
+    }
+    return hash;
 }
