@@ -196,6 +196,10 @@ pub fn main() !void {
     pc2 = thread_get_performance_counters(perf_lib, &counters, &counter_map);
 
     std.debug.print("hashSliceModule took {} cycles and {} instructions with res {}\n", .{ pc2.cycles - pc.cycles, pc2.instructions - pc.instructions, kk });
+
+   if(perf_lib.kpc_force_all_ctrs_set(0) != 0) {
+      @panic("unable to release perf counters");
+   } 
 }
 
 pub fn thread_get_performance_counters(plib: perfLib, cc: []u64, config_map: []u64) performance_counters {
