@@ -232,7 +232,7 @@ const PerformanceCounters = struct {
 };
 // threadlocal var counters = [_]u64{0} ** 32;
 
-pub fn main() !void {
+test "test that perf counters work" {
     var counter1 = [_]u64{0} ** 32;
     var counter2 = [_]u64{0} ** 32;
 
