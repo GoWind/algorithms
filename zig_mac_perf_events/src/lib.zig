@@ -55,7 +55,20 @@ const perfDb = struct {
 
     pub fn new(d: std.DynLib) Self {
         var libPerfData = d;
-        return Self{ .dynlib = d, .kpep_db_create = libPerfData.lookup(*const fn (?[*:0]const u8, **kpep_db) callconv(.C) i32, "kpep_db_create").?, .kpep_db_events_count = libPerfData.lookup(*const fn (*kpep_db, *usize) callconv(.C) i32, "kpep_db_events_count").?, .kpep_db_events = libPerfData.lookup(*const fn (*kpep_db, [*]*kpep_event, usize) callconv(.C) i32, "kpep_db_events").?, .kpep_config_create = libPerfData.lookup(*const fn (*kpep_db, **kpep_config) callconv(.C) i32, "kpep_config_create").?, .kpep_config_force_counters = libPerfData.lookup(*const fn (*kpep_config) callconv(.C) i32, "kpep_config_force_counters").?, .kpep_config_add_event = libPerfData.lookup(*const fn (*kpep_config, **kpep_event, u32, ?*u32) callconv(.C) i32, "kpep_config_add_event").?, .kpep_config_kpc_classes = libPerfData.lookup(*const fn (*kpep_config, *u32) callconv(.C) i32, "kpep_config_kpc_classes").?, .kpep_config_kpc_count = libPerfData.lookup(*const fn (*kpep_config, *usize) callconv(.C) i32, "kpep_config_kpc_count").?, .kpep_config_kpc_map = libPerfData.lookup(*const fn (*kpep_config, *usize, usize) callconv(.C) i32, "kpep_config_kpc_map").?, .kpep_config_kpc = libPerfData.lookup(*const fn (*kpep_config, *kpc_config, usize) callconv(.C) i32, "kpep_config_kpc").?, .kpep_db_event = libPerfData.lookup(*const fn (*kpep_db, [*:0]const u8, **kpep_event) callconv(.C) i32, "kpep_db_event").? };
+        return Self{
+            .dynlib = d,
+            .kpep_db_create = libPerfData.lookup(*const fn (?[*:0]const u8, **kpep_db) callconv(.C) i32, "kpep_db_create").?,
+            .kpep_db_events_count = libPerfData.lookup(*const fn (*kpep_db, *usize) callconv(.C) i32, "kpep_db_events_count").?,
+            .kpep_db_events = libPerfData.lookup(*const fn (*kpep_db, [*]*kpep_event, usize) callconv(.C) i32, "kpep_db_events").?,
+            .kpep_config_create = libPerfData.lookup(*const fn (*kpep_db, **kpep_config) callconv(.C) i32, "kpep_config_create").?,
+            .kpep_config_force_counters = libPerfData.lookup(*const fn (*kpep_config) callconv(.C) i32, "kpep_config_force_counters").?,
+            .kpep_config_add_event = libPerfData.lookup(*const fn (*kpep_config, **kpep_event, u32, ?*u32) callconv(.C) i32, "kpep_config_add_event").?,
+            .kpep_config_kpc_classes = libPerfData.lookup(*const fn (*kpep_config, *u32) callconv(.C) i32, "kpep_config_kpc_classes").?,
+            .kpep_config_kpc_count = libPerfData.lookup(*const fn (*kpep_config, *usize) callconv(.C) i32, "kpep_config_kpc_count").?,
+            .kpep_config_kpc_map = libPerfData.lookup(*const fn (*kpep_config, *usize, usize) callconv(.C) i32, "kpep_config_kpc_map").?,
+            .kpep_config_kpc = libPerfData.lookup(*const fn (*kpep_config, *kpc_config, usize) callconv(.C) i32, "kpep_config_kpc").?,
+            .kpep_db_event = libPerfData.lookup(*const fn (*kpep_db, [*:0]const u8, **kpep_event) callconv(.C) i32, "kpep_db_event").?,
+        };
     }
 };
 const perfLib = struct {
@@ -78,7 +91,17 @@ const perfLib = struct {
 
     pub fn new(d: std.DynLib) Self {
         var libPerf = d;
-        return Self{ .dyn_lib = d, .kpc_get_thread_counters = libPerf.lookup(*const fn (u32, u32, [*]u64) callconv(.C) i32, "kpc_get_thread_counters").?, .kpc_get_counter_count = libPerf.lookup(*const fn (u32) callconv(.C) u32, "kpc_get_counter_count").?, .kpc_pmu_version = libPerf.lookup(*const fn () callconv(.C) u32, "kpc_pmu_version").?, .kpc_force_all_ctrs_get = libPerf.lookup(*const fn (*i32) callconv(.C) i32, "kpc_force_all_ctrs_get").?, .kpc_force_all_ctrs_set = libPerf.lookup(*const fn (i32) callconv(.C) i32, "kpc_force_all_ctrs_set").?, .kpc_set_config = libPerf.lookup(*const fn (u32, *kpc_config) callconv(.C) i32, "kpc_set_config").?, .kpc_set_counting = libPerf.lookup(*const fn (u32) callconv(.C) i32, "kpc_set_counting").?, .kpc_set_thread_counting = libPerf.lookup(*const fn (u32) callconv(.C) i32, "kpc_set_thread_counting").? };
+        return Self{
+            .dyn_lib = d,
+            .kpc_get_thread_counters = libPerf.lookup(*const fn (u32, u32, [*]u64) callconv(.C) i32, "kpc_get_thread_counters").?,
+            .kpc_get_counter_count = libPerf.lookup(*const fn (u32) callconv(.C) u32, "kpc_get_counter_count").?,
+            .kpc_pmu_version = libPerf.lookup(*const fn () callconv(.C) u32, "kpc_pmu_version").?,
+            .kpc_force_all_ctrs_get = libPerf.lookup(*const fn (*i32) callconv(.C) i32, "kpc_force_all_ctrs_get").?,
+            .kpc_force_all_ctrs_set = libPerf.lookup(*const fn (i32) callconv(.C) i32, "kpc_force_all_ctrs_set").?,
+            .kpc_set_config = libPerf.lookup(*const fn (u32, *kpc_config) callconv(.C) i32, "kpc_set_config").?,
+            .kpc_set_counting = libPerf.lookup(*const fn (u32) callconv(.C) i32, "kpc_set_counting").?,
+            .kpc_set_thread_counting = libPerf.lookup(*const fn (u32) callconv(.C) i32, "kpc_set_thread_counting").?,
+        };
     }
 };
 
