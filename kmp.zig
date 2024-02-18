@@ -4,9 +4,9 @@ const std = @import("std");
 // *proper* suffix: A suffix of an array a whose len < len(a)
 
 // Return an array of border lengths where each element i
-// holds the length of the longest border of str[0..i]
-// A border is the longer *proper* suffix of str[0..i]
-// that is also a *proper* prefix of str[0..i]
+// holds the length of the longest border of str[0..i] (i inclusive)
+// A border is the longest *proper* prefix of str[0..i]
+// that is also a *proper* suffix of str[0..i]
 // An array of size 1 , cannot have a border, as it does not have a proper prefix or suffix
 // An array of size 2, can have a border, if and only if element 0 == element 1.
 fn borderArray(pattern: []const u8, allocator: std.mem.Allocator) ![]usize {
