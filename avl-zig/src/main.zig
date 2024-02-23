@@ -12,12 +12,12 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
         left: ?*Self = null,
         right: ?*Self = null,
         pub fn new(alloc: Allocator) !*Self {
-            var newNode = try alloc.create(Self);
+            const newNode = try alloc.create(Self);
             return newNode;
         }
 
         pub fn withKV(alloc: Allocator, key: K, val: V) !*Self {
-            var new_n = try Self.new(alloc);
+            const new_n = try Self.new(alloc);
             new_n.* = Self{ .key = key, .value = val };
             return new_n;
         }
@@ -67,11 +67,11 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
 
         pub fn balanceFactor(node: ?*Self) i32 {
             if (node) |n| {
-                var left_height = Self.Height(n.left);
-                var right_height = Self.Height(n.right);
+                const left_height = Self.Height(n.left);
+                const right_height = Self.Height(n.right);
                 // usize cannot be < 0
                 if (right_height > left_height) {
-                    var diff = right_height - left_height;
+                    const diff = right_height - left_height;
                     return -1 * @as(i32, @intCast(diff));
                 } else {
                     return @as(i32, @intCast(left_height - right_height));
@@ -97,7 +97,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
             }
             cur.height = 1 + @max(Self.Height(cur.left), Self.Height(cur.right));
 
-            var balance = Self.balanceFactor(cur);
+            const balance = Self.balanceFactor(cur);
             if (balance == -1 or balance == 0 or balance == 1) {
                 return cur;
             }
@@ -128,15 +128,15 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
                 node.right = Self.delete(node.right, alloc, key);
             } else {
                 if (node.left == null) {
-                    var tmp = node.right;
+                    const tmp = node.right;
                     alloc.destroy(node);
                     return tmp;
                 } else if (node.right == null) {
-                    var tmp = node.left;
+                    const tmp = node.left;
                     alloc.destroy(node);
                     return tmp;
                 } else {
-                    var tmp = Self.getMinValNode(node.right.?);
+                    const tmp = Self.getMinValNode(node.right.?);
                     node.key = tmp.key;
                     node.value = tmp.value;
                     node.right = Self.delete(node.right, alloc, tmp.key);
@@ -148,7 +148,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
             // This section is reached, if the deleted node is a child leaf/node of the current node
             // we check that all the nodes from the deleted leaf/node -> root are balanced and if not, rebalance
             node.height = 1 + @max(Self.Height(node.left), Self.Height(node.right));
-            var balance = Self.balanceFactor(self);
+            const balance = Self.balanceFactor(self);
             // Left Left
             if (balance > 1 and Self.balanceFactor(node.left) >= 0) {
                 return Self.rotateRight(node);
@@ -177,7 +177,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
             return getMinValNode(node.left.?);
         }
         pub fn check(node: *Self) void {
-            var balance = Self.balanceFactor(node);
+            const balance = Self.balanceFactor(node);
             if (balance > 1 or balance < -1) {
                 std.debug.print("unbalanced tree at key {}\n", .{node.key});
                 @panic("unbalanced");
@@ -223,7 +223,7 @@ fn AvlTree(comptime K: type, comptime V: type) type {
         const node_type = AvlNode(K, V);
         root: ?*node_type = null,
         pub fn insert(self: *Self, alloc: Allocator, key: K, val: V) !void {
-            var new_node = try node_type.withKV(alloc, key, val);
+            const new_node = try node_type.withKV(alloc, key, val);
             self.root = node_type.insert(self.root, new_node);
         }
         pub fn delete(self: *Self, alloc: Allocator, key: K) void {
@@ -245,7 +245,7 @@ pub fn main() !void {
     std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
-    var allocator = arena.allocator();
+    const allocator = arena.allocator();
     // u32 -> u32
     const utree = AvlTree(u32, u32);
     // i32 key -> f32 value
@@ -261,9 +261,9 @@ pub fn main() !void {
     var keysList = std.ArrayList(u32).init(allocator);
 
     while (i < 100) : (i += 1) {
-        var key: u32 = random.int(u32);
-        var value: u32 = random.uintAtMost(u32, 350000);
-        var fpvalue: f32 = random.float(f32);
+        const key: u32 = random.int(u32);
+        const value: u32 = random.uintAtMost(u32, 350000);
+        const fpvalue: f32 = random.float(f32);
         try tree.insert(allocator, key, value);
         try fp_tree.insert(allocator, key, fpvalue);
         tree.root.?.check();
@@ -271,9 +271,9 @@ pub fn main() !void {
         try keysList.append(key);
     }
     for (keysList.items) |k| {
-        var v = tree.search(k);
+        const v = tree.search(k);
         std.debug.assert(v != null);
-        var fp_v = tree.search(k);
+        const fp_v = tree.search(k);
         std.debug.assert(fp_v != null);
         tree.delete(allocator, k);
         if (tree.root != null) {

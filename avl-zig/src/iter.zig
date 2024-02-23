@@ -14,52 +14,51 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
         left: ?*Self = null,
         right: ?*Self = null,
         pub fn new(alloc: Allocator) !*Self {
-            var newNode = try alloc.create(Self);
+            const newNode = try alloc.create(Self);
             return newNode;
         }
 
-	pub fn bst_print_dot(maybe_tree: ?*Self, writer: *std.fs.File.Writer) !void {
-		try writer.print("digraph BST {{\n", .{});
-		try writer.print("    node [fontname=\"Arial\"];\n", .{});
-		if(maybe_tree) |tree| {
-			try writer.print("\n", .{});
-			
-			if(tree.left == null and tree.right == null) {
-				try writer.print("    {};\n", .{tree.key});
-			} else {
-				try Self.bst_print_dot_aux(tree, writer);
-			}
-		}
-		try writer.print("}}\n", .{});
-	}
-	fn bst_print_dot_aux(node: *Self, writer: *std.fs.File.Writer) !void {
-		const NodeCounter = struct {
-		var node_count: usize = 0;
-		};
-    		if (node.left) |l| {
-			try writer.print("    {} -> {};\n", .{node.key, l.key});
-			try Self.bst_print_dot_aux(l, writer);
-		} else {
-			NodeCounter.node_count += 1;
-			try Self.bst_print_dot_null(node, NodeCounter.node_count, writer);
-		}
-		if(node.right) |r| {
-			try writer.print("    {} -> {};\n", .{node.key, r.key});
-			try Self.bst_print_dot_aux(r, writer);
-		} else {
-			NodeCounter.node_count += 1;
-			try Self.bst_print_dot_null(node, NodeCounter.node_count, writer);
-		}
+        pub fn bst_print_dot(maybe_tree: ?*Self, writer: *std.fs.File.Writer) !void {
+            try writer.print("digraph BST {{\n", .{});
+            try writer.print("    node [fontname=\"Arial\"];\n", .{});
+            if (maybe_tree) |tree| {
+                try writer.print("\n", .{});
 
-	}
-	
-	fn bst_print_dot_null(node: *Self, node_count: usize, writer: *std.fs.File.Writer) !void {
-		try writer.print("    null{} [shape=point];\n", .{node_count});
-		try writer.print("    {} -> null{};\n", .{node.key, node_count});
-	}
+                if (tree.left == null and tree.right == null) {
+                    try writer.print("    {};\n", .{tree.key});
+                } else {
+                    try Self.bst_print_dot_aux(tree, writer);
+                }
+            }
+            try writer.print("}}\n", .{});
+        }
+        fn bst_print_dot_aux(node: *Self, writer: *std.fs.File.Writer) !void {
+            const NodeCounter = struct {
+                var node_count: usize = 0;
+            };
+            if (node.left) |l| {
+                try writer.print("    {} -> {};\n", .{ node.key, l.key });
+                try Self.bst_print_dot_aux(l, writer);
+            } else {
+                NodeCounter.node_count += 1;
+                try Self.bst_print_dot_null(node, NodeCounter.node_count, writer);
+            }
+            if (node.right) |r| {
+                try writer.print("    {} -> {};\n", .{ node.key, r.key });
+                try Self.bst_print_dot_aux(r, writer);
+            } else {
+                NodeCounter.node_count += 1;
+                try Self.bst_print_dot_null(node, NodeCounter.node_count, writer);
+            }
+        }
 
-	pub fn withKV(alloc: Allocator, key: K, val: V) !*Self {
-            var new_n = try Self.new(alloc);
+        fn bst_print_dot_null(node: *Self, node_count: usize, writer: *std.fs.File.Writer) !void {
+            try writer.print("    null{} [shape=point];\n", .{node_count});
+            try writer.print("    {} -> null{};\n", .{ node.key, node_count });
+        }
+
+        pub fn withKV(alloc: Allocator, key: K, val: V) !*Self {
+            const new_n = try Self.new(alloc);
             new_n.* = Self{ .key = key, .value = val };
             return new_n;
         }
@@ -109,11 +108,11 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
 
         pub fn balanceFactor(node: ?*Self) i32 {
             if (node) |n| {
-                var left_height = Self.Height(n.left);
-                var right_height = Self.Height(n.right);
+                const left_height = Self.Height(n.left);
+                const right_height = Self.Height(n.right);
                 // usize cannot be < 0
                 if (right_height > left_height) {
-                    var diff = right_height - left_height;
+                    const diff = right_height - left_height;
                     return -1 * @as(i32, @intCast(diff));
                 } else {
                     return @as(i32, @intCast(left_height - right_height));
@@ -158,10 +157,10 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
             try traversal_list.append(cur);
             var r_idx: usize = 0;
             while (r_idx < traversal_list.items.len) : (r_idx += 1) {
-                var idx = traversal_list.items.len - r_idx - 1;
+                const idx = traversal_list.items.len - r_idx - 1;
                 var elem = traversal_list.items[idx];
                 elem.update();
-                var balance = Self.balanceFactor(elem);
+                const balance = Self.balanceFactor(elem);
                 if (balance == -1 or balance == 0 or balance == 1) {
                     continue;
                 }
@@ -200,7 +199,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
         }
 
         fn balanceNode(elem: *Self) *Self {
-            var balance = Self.balanceFactor(elem);
+            const balance = Self.balanceFactor(elem);
             if (balance == -1 or balance == 0 or balance == 1) {
                 return elem;
             }
@@ -232,8 +231,8 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
                 } else {
                     us_parent.right = v;
                 }
-            }         
-	}
+            }
+        }
         pub fn deleteIter(self: ?*Self, node_alloc: Allocator, key: K) ?*Self {
             if (self == null) {
                 return null;
@@ -250,8 +249,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
                 if (cur_node.?.key > key and cur_node.?.left != null) {
                     traversal_list.append(cur_node.?) catch @panic("allocation error");
                     cur_node = cur_node.?.left;
-                }
-                else if (cur_node.?.key < key and cur_node.?.right != null) {
+                } else if (cur_node.?.key < key and cur_node.?.right != null) {
                     traversal_list.append(cur_node.?) catch @panic("allocation error");
                     cur_node = cur_node.?.right;
                 } else {
@@ -302,7 +300,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
             }
             var r_idx: usize = 0;
             while (r_idx < traversal_list.items.len) : (r_idx += 1) {
-                var idx = traversal_list.items.len - r_idx - 1;
+                const idx = traversal_list.items.len - r_idx - 1;
                 var last_item = traversal_list.items[idx];
                 last_item.update();
                 last_item = last_item.balanceNode();
@@ -322,7 +320,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
         }
 
         pub fn check(node: *Self) bool {
-            var balance = Self.balanceFactor(node);
+            const balance = Self.balanceFactor(node);
             if (balance > 1 or balance < -1) {
                 std.debug.print("unbalanced {} left {} and right {} keys and balanceFactor {} \n", .{ node.key, node.left.?.key, node.right.?.key, balance });
                 return false;
@@ -343,7 +341,7 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
                 }
                 right_check = Self.check(node.right.?);
             }
-	    return left_check and right_check;
+            return left_check and right_check;
         }
 
         pub fn search(self: *Self, key: K) ?u32 {
@@ -373,7 +371,7 @@ fn AvlTree(comptime K: type, comptime V: type) type {
         const node_type = AvlNode(K, V);
         root: ?*node_type = null,
         pub fn insert(self: *Self, alloc: Allocator, key: K, val: V) !void {
-            var new_node = try node_type.withKV(alloc, key, val);
+            const new_node = try node_type.withKV(alloc, key, val);
             self.root = try node_type.insert(self.root, new_node);
         }
         pub fn delete(self: *Self, alloc: Allocator, key: K) void {
@@ -393,7 +391,7 @@ fn AvlTree(comptime K: type, comptime V: type) type {
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
-    var allocator = arena.allocator();
+    const allocator = arena.allocator();
     // u32 -> u32
     const utree = AvlTree(u32, u32);
 
@@ -406,8 +404,8 @@ pub fn main() !void {
     var keysList = std.ArrayList(u32).init(allocator);
 
     while (i < 100) : (i += 1) {
-        var key: u32 = random.intRangeAtMost(u32, 10, 99999);
-        var value: u32 = random.uintAtMost(u32, 350000);
+        const key: u32 = random.intRangeAtMost(u32, 10, 99999);
+        const value: u32 = random.uintAtMost(u32, 350000);
         try tree.insert(allocator, key, value);
         std.debug.assert(tree.root.?.check() == true);
         try keysList.append(key);
@@ -415,22 +413,21 @@ pub fn main() !void {
     for (keysList.items) |k| {
         var v = tree.search(k);
         if (v == null) {
-		@panic("failed to delete and return something");
+            @panic("failed to delete and return something");
         }
         tree.delete(allocator, k);
-	v = tree.search(k);
-	if(v != null) {
-	   std.debug.print("failed to delete {}\n", .{k});
-	   try tree.root.?.bst_print_dot(&stdout);
-	   @panic("kokaka");
-	}
+        v = tree.search(k);
+        if (v != null) {
+            std.debug.print("failed to delete {}\n", .{k});
+            try tree.root.?.bst_print_dot(&stdout);
+            @panic("kokaka");
+        }
         if (tree.root != null and tree.root.?.check() == false) {
-		try tree.root.?.bst_print_dot(&stdout);
-		@panic("check failed after delete");
+            try tree.root.?.bst_print_dot(&stdout);
+            @panic("check failed after delete");
         }
     }
     std.debug.assert(tree.root == null);
 }
-
 
 test "simple test" {}
