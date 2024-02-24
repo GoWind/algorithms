@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const perfInstruments = @import("perfLib");
 
 pub fn AvlNode(comptime K: type, comptime V: type) type {
     return struct {
@@ -241,11 +242,17 @@ fn AvlTree(comptime K: type, comptime V: type) type {
 }
 
 pub fn main() !void {
+    var counter1 = [_]u64{0} ** 32;
+    var counter2 = [_]u64{0} ** 32;
     // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
     std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
+    const events_slice: []const []const u8 = &perfInstruments.m2MacEvents;
+    var perfCounters = try perfInstruments.Perf.init(events_slice, allocator);
+    defer perfCounters.deinit();
+
     // u32 -> u32
     const utree = AvlTree(u32, u32);
     // i32 key -> f32 value
@@ -264,7 +271,11 @@ pub fn main() !void {
         const key: u32 = random.int(u32);
         const value: u32 = random.uintAtMost(u32, 350000);
         const fpvalue: f32 = random.float(f32);
+        const pc = perfCounters.getThreadCounters(&counter1);
         try tree.insert(allocator, key, value);
+        const pc2 = perfCounters.getThreadCounters(&counter2);
+        std.debug.print("insert took {} cycles and {} instructions with\n", .{ pc2.cycles - pc.cycles, pc2.instructions - pc.instructions });
+
         try fp_tree.insert(allocator, key, fpvalue);
         tree.root.?.check();
         fp_tree.root.?.check();
@@ -275,7 +286,10 @@ pub fn main() !void {
         std.debug.assert(v != null);
         const fp_v = tree.search(k);
         std.debug.assert(fp_v != null);
+        const pc = perfCounters.getThreadCounters(&counter1);
         tree.delete(allocator, k);
+        const pc2 = perfCounters.getThreadCounters(&counter2);
+        std.debug.print("delete took {} cycles and {} instructions\n", .{ pc2.cycles - pc.cycles, pc2.instructions - pc.instructions });
         if (tree.root != null) {
             tree.root.?.check();
         }

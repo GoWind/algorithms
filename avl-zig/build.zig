@@ -12,13 +12,16 @@ pub fn build(b: *std.build.Builder) void {
         .root_source_file = .{ .path = "src/main.zig" },
     });
 
+    const perfInstrumentation = b.dependency("zig_mac_perf_events", .{});
+    exe.addModule("perfLib", perfInstrumentation.module("perfLib"));
+
     // exe artifact for iterative version
     const iterableExe = b.addExecutable(.{
-        .name = "avl-zig",
+        .name = "avl-zig-iter",
         .root_source_file = .{ .path = "src/iter.zig" },
         .optimize = optimizeOption,
     });
-
+    iterableExe.addModule("perfLib", perfInstrumentation.module("perfLib"));
     const run_cmd = b.addRunArtifact(exe);
     const run_iter_example = b.addRunArtifact(iterableExe);
 
@@ -26,7 +29,9 @@ pub fn build(b: *std.build.Builder) void {
     run_step.dependOn(&run_cmd.step);
     run_step.dependOn(&run_iter_example.step);
 
-
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&exe_tests.step);
+
+    b.installArtifact(exe);
+    b.installArtifact(iterableExe);
 }

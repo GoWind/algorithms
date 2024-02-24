@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Order = std.math.Order;
 var stdout = std.io.getStdOut().writer();
+const perfInstruments = @import("perfLib");
 
 pub fn AvlNode(comptime K: type, comptime V: type) type {
     return struct {
@@ -237,7 +238,6 @@ pub fn AvlNode(comptime K: type, comptime V: type) type {
             if (self == null) {
                 return null;
             }
-            std.debug.print("deleting {}\n", .{key});
             const root = self;
             // traversal list
             var buffer: [1000]u8 = undefined;
@@ -389,9 +389,15 @@ fn AvlTree(comptime K: type, comptime V: type) type {
 }
 
 pub fn main() !void {
+    var counter1 = [_]u64{0} ** 32;
+    var counter2 = [_]u64{0} ** 32;
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
+    const events_slice: []const []const u8 = &perfInstruments.m2MacEvents;
+    var perfCounters = try perfInstruments.Perf.init(events_slice, allocator);
+    defer _ = &perfCounters.deinit();
+
     // u32 -> u32
     const utree = AvlTree(u32, u32);
 
@@ -406,7 +412,11 @@ pub fn main() !void {
     while (i < 100) : (i += 1) {
         const key: u32 = random.intRangeAtMost(u32, 10, 99999);
         const value: u32 = random.uintAtMost(u32, 350000);
+        const pc = perfCounters.getThreadCounters(&counter1);
         try tree.insert(allocator, key, value);
+        const pc2 = perfCounters.getThreadCounters(&counter2);
+        std.debug.print("insert took {} cycles and {} instructions\n", .{ pc2.cycles - pc.cycles, pc2.instructions - pc.instructions });
+
         std.debug.assert(tree.root.?.check() == true);
         try keysList.append(key);
     }
@@ -415,7 +425,11 @@ pub fn main() !void {
         if (v == null) {
             @panic("failed to delete and return something");
         }
+        const pc = perfCounters.getThreadCounters(&counter1);
         tree.delete(allocator, k);
+        const pc2 = perfCounters.getThreadCounters(&counter2);
+        std.debug.print("delete took {} cycles and {} instructions\n", .{ pc2.cycles - pc.cycles, pc2.instructions - pc.instructions });
+
         v = tree.search(k);
         if (v != null) {
             std.debug.print("failed to delete {}\n", .{k});
