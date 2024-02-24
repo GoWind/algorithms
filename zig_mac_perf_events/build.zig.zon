@@ -1,0 +1,8 @@
+.{
+  .name = "zig_mac_perf_events",
+  .version = "0.1.0",
+  .paths = .{"src",
+             "build.zig",
+             "build.zig.zon",
+            }
+}
