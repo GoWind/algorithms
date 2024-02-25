@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 const Order = std.math.Order;
 var stdout = std.io.getStdOut().writer();
 const perfInstruments = @import("perfLib");
+const buildOptions = @import("build_options");
 
 pub fn AvlNode(comptime K: type, comptime V: type) type {
     return struct {
@@ -394,9 +395,11 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
-    const events_slice: []const []const u8 = &perfInstruments.m2MacEvents;
-    var perfCounters = try perfInstruments.Perf.init(events_slice, allocator);
-    defer _ = &perfCounters.deinit();
+    var perfCounters = if (buildOptions.enable_perf_instrument)
+        try perfInstruments.Perf.init(&perfInstruments.m2MacEvents, allocator)
+    else
+        try perfInstruments.NoOpPerf.init(&perfInstruments.m2MacEvents, allocator) catch @panic("unable to initialize perf counters");
+    defer perfCounters.deinit();
 
     // u32 -> u32
     const utree = AvlTree(u32, u32);

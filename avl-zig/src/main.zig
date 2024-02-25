@@ -1,6 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const perfInstruments = @import("perfLib");
+const buildOptions = @import("build_options");
 
 pub fn AvlNode(comptime K: type, comptime V: type) type {
     return struct {
@@ -249,8 +250,10 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
-    const events_slice: []const []const u8 = &perfInstruments.m2MacEvents;
-    var perfCounters = try perfInstruments.Perf.init(events_slice, allocator);
+    var perfCounters = if (buildOptions.enable_perf_instrument)
+        try perfInstruments.Perf.init(&perfInstruments.m2MacEvents, allocator)
+    else
+        try perfInstruments.NoOpPerf.init(&perfInstruments.m2MacEvents, allocator) catch @panic("unable to initialize perf counters");
     defer perfCounters.deinit();
 
     // u32 -> u32
@@ -267,7 +270,7 @@ pub fn main() !void {
     var i: usize = 0;
     var keysList = std.ArrayList(u32).init(allocator);
 
-    while (i < 100) : (i += 1) {
+    while (i < 10000) : (i += 1) {
         const key: u32 = random.int(u32);
         const value: u32 = random.uintAtMost(u32, 350000);
         const fpvalue: f32 = random.float(f32);

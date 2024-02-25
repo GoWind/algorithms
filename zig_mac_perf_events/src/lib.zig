@@ -247,6 +247,22 @@ pub const Perf = struct {
     }
 };
 
+pub const NoOpPerf = struct {
+    const Self = @This();
+    pub fn init(requested_events: []const []const u8, allocator: std.mem.Allocator) !Self {
+        _ = requested_events;
+        _ = allocator;
+        return Self{};
+    }
+    pub fn deinit(self: Self) void {
+        _ = self;
+    }
+    pub fn getThreadCounters(self: Self, counters: []u64) PerformanceCounters {
+        _ = self;
+        _ = counters;
+        return PerformanceCounters{ .cycles = 0, .instructions = 0, .branches = 0, .branch_misses = 0 };
+    }
+};
 const PerformanceCounters = struct {
     cycles: u64,
     instructions: u64,
