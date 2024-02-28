@@ -253,7 +253,7 @@ pub fn main() !void {
     var perfCounters = if (buildOptions.enable_perf_instrument)
         try perfInstruments.Perf.init(&perfInstruments.m2MacEvents, allocator)
     else
-        try perfInstruments.NoOpPerf.init(&perfInstruments.m2MacEvents, allocator) catch @panic("unable to initialize perf counters");
+        perfInstruments.NoOpPerf.init(&perfInstruments.m2MacEvents, allocator);
     defer perfCounters.deinit();
 
     // u32 -> u32

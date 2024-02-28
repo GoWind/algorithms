@@ -249,7 +249,7 @@ pub const Perf = struct {
 
 pub const NoOpPerf = struct {
     const Self = @This();
-    pub fn init(requested_events: []const []const u8, allocator: std.mem.Allocator) !Self {
+    pub fn init(requested_events: []const []const u8, allocator: std.mem.Allocator) Self {
         _ = requested_events;
         _ = allocator;
         return Self{};
