@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-processor-operator
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: image-processor-operator
+  template:
+    metadata:
+      labels:
+        app: image-processor-operator
+    spec:
+      serviceAccountName: image-processor-operator
+      containers:
+      - name: manager
+        image: image-processor-operator:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: image-processor-operator
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: image-processor-operator
+rules:
+- apiGroups: ["imaging.example.com"]
+  resources: ["imageprocessors"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["imaging.example.com"]
+  resources: ["imageprocessors/status"]
+  verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: image-processor-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: image-processor-operator
+subjects:
+- kind: ServiceAccount
+  name: image-processor-operator
+  namespace: default
