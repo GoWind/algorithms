@@ -1,0 +1,15 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "image-processor-operator.fullname" . }}
+  labels:
+    {{- include "image-processor-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups: ["imaging.example.com"]
+  resources: ["imageprocessors"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["imaging.example.com"]
+  resources: ["imageprocessors/status"]
+  verbs: ["get", "update", "patch"]
+{{- end }}
